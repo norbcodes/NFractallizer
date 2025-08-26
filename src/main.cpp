@@ -18,8 +18,6 @@
 #include <cmath>
 #include <vector>
 #include <complex>
-#include <chrono>
-#include <iostream>
 #include <thread>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
@@ -29,11 +27,11 @@
 #include <stb/stb_image_write.h>
 
 typedef boost::multiprecision::cpp_dec_float_100 nfloat;
-typedef std::complex<boost::multiprecision::cpp_dec_float_100> ncomplex;
+typedef std::complex<nfloat> ncomplex;
 
 #define FRAME_W 640
 #define FRAME_H 360
-#define MAX_ITERS 50
+#define MAX_ITERS 100
 #define ESCAPE_BOUNDARY static_cast<nfloat>(2.0)
 
 struct RGB
@@ -63,16 +61,26 @@ RGB Colorize(const ncomplex& C, uint64_t Bounces)
     return {0, 0, static_cast<uint8_t>(std::floor((ClampedBounces / 64.0) * 255.0))};
 }
 
+#define QUARTER     static_cast<nfloat>(1.0/4.0)
+#define SIXTEENTH   static_cast<nfloat>(1.0/16.0)
+
 Point CalculatePoint(const nfloat& PX, const nfloat& PY)
 {
     ncomplex C(PX, PY);
     ncomplex Z(0.0, 0.0);
 
+    nfloat Q = ((PX - QUARTER) * (PX - QUARTER)) + (PY * PY);
+
+    if ( ((PX + 1) * (PX + 1) + (PY * PY) <= SIXTEENTH) || (Q*(Q+(PX - QUARTER)) <= (PY*PY)*QUARTER) )
+    {
+        return {PX, PY, {0, 0, 0}};
+    }
+
     for (uint64_t Iter = 0; Iter < MAX_ITERS; Iter++)
     {
         Z = (Z * Z) + C;
 
-        if (Z.real() > ESCAPE_BOUNDARY || Z.imag() > ESCAPE_BOUNDARY)
+        if (boost::multiprecision::abs(Z.real()) > ESCAPE_BOUNDARY || boost::multiprecision::abs(Z.imag()) > ESCAPE_BOUNDARY)
         {
             return {PX, PY, Colorize(C, Iter)};
         }
